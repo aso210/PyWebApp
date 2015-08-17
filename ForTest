@@ -1,5 +1,7 @@
 i am testing testing testing.....
 
+生成秘钥
+ssh-keygen -t rsa -C "youremail@example.com"
 克隆远程库
 git clone git@github.com:aso210/Hello.git
 关联远程库
