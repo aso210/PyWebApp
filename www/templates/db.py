@@ -1,6 +1,6 @@
 __author__ = 'aso'
 
-import logging, threading, functools
+import logging, threading, functools, time
 
 # global engine object:
 engine = None
@@ -60,12 +60,14 @@ class _DBCtx(threading.local):
 
     def __init__(self):
         self.connection = None
+        self.transactions = 0
 
     def is_inited(self):
         return not self.connection is None
 
     def init(self):
         self.connection = _LasyConnection()
+        self.transactions = 0
 
     def cleanup(self):
         self.connection.cleanup()
@@ -91,7 +93,6 @@ class _ConnectionCtx(object):
             _dbctx.cleanup()
 
 def connection():
-
     return _ConnectionCtx()
 
 def with_connection(func):
@@ -100,6 +101,117 @@ def with_connection(func):
         with connection():
             return func(*args, **kw)
     return wrapper
+
+class _TransactionCtx(object):
+
+    def __enter__(self):
+        global _dbctx
+        self.should_cleanup = False
+        if not _dbctx.is_inited():
+            _dbctx.init()
+            self.should_cleanup = True
+        _dbctx.transactions = _dbctx.transactions + 1
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        global _dbctx
+        _dbctx.transactions = _dbctx.transactions - 1
+        try:
+            if _dbctx.transactions == 0:
+
+                if exc_type is None:
+                    self.commit()
+                else:
+                    self.rollback()
+        finally:
+            if self.should_cleanup:
+                _dbctx.cleanup()
+
+    def commit(self):
+        global _dbctx
+        logging.info('commit transaction...')
+        try:
+            _dbctx.connection.commit()
+            logging.info('commit transaction successed...')
+        except:
+            logging.info('commit transaction failed...')
+            _dbctx.connection.rollback()
+            logging.info('rollback transaction successed...')
+            raise
+
+    def rollback(self):
+        global _dbctx
+        logging.info('rollback transaction ...')
+        _dbctx.connection.rollback()
+        logging.info('rollback transaction successed...')
+
+
+def transaction():
+    return _TransactionCtx()
+
+def _profiling(start, sql=''):
+    t = time.time() - start
+    if t > 0.1:
+        logging.warning('[PROFILING] [DB] %s: %s' % (t, sql))
+    else:
+        logging.info('[PROFILING] [DB] %s: %s' % (t, sql))
+
+def with_transation(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kw):
+        _start = time.time()
+        with transaction():
+            return func(*args, **kw)
+        _profiling(_start)
+    return wrapper
+
+class Dict(dict):
+
+    def __init__(self, names=(), values=(), **kw):
+        super(Dict, self).__init__(**kw)
+        for k,v in zip(names, values):
+            self[k] = v
+
+    def __getattr__(self, key):
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(r"'Dict' object has no attribute '%s'" % key)
+
+    def __set__(self, key, value):
+        self[key] = value
+
+def _select(sql, isFirst, *args):
+    global _dbctx
+    sql = sql.replace('?', '%s')
+    logging.info('sql= %s  args= %s' % (sql, args))
+    cursor = None
+    try:
+        cursor = _dbctx.connection.cursor()
+        cursor.execute(sql, args)
+        if cursor.description:
+            names = [x[0] for x in cursor.description]
+            logging.info('names=%s' % names)
+        if isFirst:
+            values = cursor.fetchone()
+            if not values:
+                return None
+            else:
+                return Dict(names, values)
+        values = cursor.fetchall()
+        logging.info('values= %s' % values)
+        return [Dict(names, x) for x in values]
+    finally:
+        if cursor:
+            cursor.close()
+
+@with_connection
+def select(sql, *args):
+    return _select(sql, False, *args)
+
+@with_connection
+def select_one(sql, *args):
+    return _select(sql, True, *args)
 
 @with_connection
 def _update(sql, *args):
@@ -128,4 +240,6 @@ class DBError(Exception):
 if __name__== '__main__':
     logging.basicConfig(level=logging.DEBUG)
     creat_engine('aso', '1234', 'my_test')
-    update("update student set name=? where id=?", 'hahhaha', '1')
+    update("update student set sex=?", 'nan')
+    result = select('select * from student')
+    print 'dd=', result[1]
