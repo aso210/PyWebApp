@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 __author__ = 'aso'
 
 import logging, threading, functools, time
@@ -214,6 +216,10 @@ def select_one(sql, *args):
     return _select(sql, True, *args)
 
 @with_connection
+def insert(sql, *args):
+    return _update(sql, *args)
+
+@with_connection
 def _update(sql, *args):
     global _dbctx
     cursor = None
@@ -233,13 +239,18 @@ def _update(sql, *args):
 def update(sql, *args):
     return _update(sql, *args)
 
+def delete(sql, *args):
+    return _update(sql, *args)
 
 class DBError(Exception):
     pass
 
 if __name__== '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    creat_engine('aso', '1234', 'my_test')
-    update("update student set sex=?", 'nan')
+    creat_engine('aso', '1234', 'mytest')
+    row = insert('insert into student(id, name, age, score) values (?,?,?,?)', 4,'明明',14, 80)
+    # row = delete('delete from student where id=?', 1)
+    print 'row=', row
     result = select('select * from student')
-    print 'dd=', result[1]
+    for s in result:
+        print 'student %s = %s' % (s.id, s)
