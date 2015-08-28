@@ -248,9 +248,15 @@ class DBError(Exception):
 if __name__== '__main__':
     logging.basicConfig(level=logging.DEBUG)
     creat_engine('aso', '1234', 'mytest')
-    row = insert('insert into student(id, name, age, score) values (?,?,?,?)', 4,'明明',14, 80)
+    # row = insert('insert into student(id, name, age, score) values (?,?,?,?)', 4,'明明',14, 80)
+    # with transaction():
+    #     insert('insert into student(id, name, age, score) values (?,?,?,?)', 5,'hehe',14, 80)
+    #     insert('insert into student(id, name, age, score) values (?,?,?,?)', 6,'hehe',14, 80)
+    #     insert('insert into student(id, name, age, score) values (?,?,?,?)', 7,'hehe',14, 80)
+    #     insert('insert into student(id, name, age, score) values (?,?,?,?)', 8,'hehe',14, 80)
     # row = delete('delete from student where id=?', 1)
-    print 'row=', row
+    # print 'row=', row
     result = select('select * from student')
     for s in result:
+        print type(s)
         print 'student %s = %s' % (s.id, s)
